@@ -67,7 +67,7 @@ def enabled(name):
     return ret
 
 
-def disabled(name):
+def disabled(name, force=False):
     '''
     Ensure an Apache module is disabled.
 
@@ -87,7 +87,7 @@ def disabled(name):
             ret['changes']['new'] = None
             ret['result'] = None
             return ret
-        status = __salt__['apache.a2dismod'](name)['Status']
+        status = __salt__['apache.a2dismod'](name, force=force)['Status']
         if isinstance(status, six.string_types) and 'disabled' in status:
             ret['result'] = True
             ret['changes']['old'] = name

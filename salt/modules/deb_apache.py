@@ -197,36 +197,56 @@ def a2enmod(mod):
     return ret
 
 
-def a2dismod(mod):
+def a2dismod(mod, force=False):
     '''
     Runs a2dismod for the given mod.
 
     This will only be functional on Debian-based operating systems (Ubuntu,
     Mint, etc).
 
+    mod
+        Name of the apache mod to disable
+    force
+        Bypass the safety check for modules marked essential (e.g. autoindex)
+
     CLI Examples:
 
     .. code-block:: bash
 
         salt '*' apache.a2dismod vhost_alias
+        salt '*' apache.a2dismod autoindex force=True
     '''
     ret = {}
     command = ['a2dismod', mod]
 
+    # the debian a2dismod script will prompt users for input if they try to
+    # disable common modules (e.g. autoindex). if the user sets force=True
+    # we run the command with -f to bypass the check.
+    if force:
+        command.append('-f')
+
     try:
-        status = __salt__['cmd.retcode'](command, python_shell=False)
+        # this command runs a perl script and should finish in milliseconds
+        # or pause for input. the timeout of 10 seconds should give even
+        # busy or slow systems time to complete the command
+        result = __salt__['cmd.run_all'](command,
+                                         timeout=10,
+                                         python_shell=False)
+
     except Exception as e:
         return e
 
     ret['Name'] = 'Apache2 Disable Mod'
     ret['Mod'] = mod
 
-    if status == 256:
+    if result['retcode'] == 256:
         ret['Status'] = 'Mod {0} Not found'.format(mod)
-    elif status == 0:
+    elif result['retcode'] == 1 and 'Timed out' in result['stdout']:
+        ret['Status'] = 'Cannot disable mod {0} without force=True'.format(mod)
+    elif result['retcode'] == 0:
         ret['Status'] = 'Mod {0} disabled'.format(mod)
     else:
-        ret['Status'] = status
+        ret['Status'] = result['stdout']
 
     return ret
 

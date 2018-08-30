@@ -29,6 +29,15 @@ class DebApacheTestCase(TestCase, LoaderModuleMockMixin):
     def setup_loader_modules(self):
         return {deb_apache: {}}
 
+
+    @staticmethod
+    def _m_all(stdout='', retcode=0):
+        '''
+        Return value for cmd.run_all.
+        '''
+        return MagicMock(return_value={'retcode': retcode, 'stdout': stdout})
+
+
     # 'check_site_enabled' function tests: 3
 
     def test_check_site_enabled(self):
@@ -200,14 +209,14 @@ class DebApacheTestCase(TestCase, LoaderModuleMockMixin):
             self.assertEqual(six.text_type(deb_apache.a2enmod('vhost_alias')),
                              'error')
 
-    # 'a2dismod' function tests: 4
+    # 'a2dismod' function tests: 6
 
     def test_a2dismod_notfound(self):
         '''
         Test if it runs a2dismod for the given module.
         '''
-        mock = MagicMock(return_value=256)
-        with patch.dict(deb_apache.__salt__, {'cmd.retcode': mock}):
+        mock = self._m_all(retcode=256)
+        with patch.dict(deb_apache.__salt__, {'cmd.run_all': mock}):
             self.assertEqual(deb_apache.a2dismod('vhost_alias'),
                              {'Name': 'Apache2 Disable Mod',
                                'Mod': 'vhost_alias',
@@ -217,30 +226,51 @@ class DebApacheTestCase(TestCase, LoaderModuleMockMixin):
         '''
         Test if it runs a2dismod for the given module.
         '''
-        mock = MagicMock(return_value=0)
-        with patch.dict(deb_apache.__salt__, {'cmd.retcode': mock}):
+        with patch.dict(deb_apache.__salt__, {'cmd.run_all': self._m_all()}):
             self.assertEqual(deb_apache.a2dismod('vhost_alias'),
                              {'Name': 'Apache2 Disable Mod',
                                'Mod': 'vhost_alias',
                                 'Status': 'Mod vhost_alias disabled'})
 
-    def test_a2dismod(self):
+    def test_a2dismod_other(self):
         '''
         Test if it runs a2dismod for the given module.
         '''
-        mock = MagicMock(return_value=2)
-        with patch.dict(deb_apache.__salt__, {'cmd.retcode': mock}):
+        mock = self._m_all(stdout='example stdout', retcode=2)
+        with patch.dict(deb_apache.__salt__, {'cmd.run_all': mock}):
             self.assertEqual(deb_apache.a2dismod('vhost_alias'),
                              {'Name': 'Apache2 Disable Mod',
                                'Mod': 'vhost_alias',
-                                'Status': 2})
+                                'Status': 'example stdout'})
+
+    def test_a2dismod_force(self):
+        '''
+        Test if it runs a2dismod for the given module.
+        '''
+        with patch.dict(deb_apache.__salt__, {'cmd.run_all': self._m_all()}):
+            self.assertEqual(deb_apache.a2dismod('autoindex', force=True),
+                             {'Name': 'Apache2 Disable Mod',
+                               'Mod': 'autoindex',
+                                'Status': 'Mod autoindex disabled'})
+
+    def test_a2dismod_timeout(self):
+        '''
+        Test if it runs a2dismod for the given module.
+        '''
+        mock = self._m_all(stdout='Timed out', retcode=1)
+        expected_status = 'Cannot disable mod autoindex without force=True'
+        with patch.dict(deb_apache.__salt__, {'cmd.run_all': mock}):
+            self.assertEqual(deb_apache.a2dismod('autoindex'),
+                             {'Name': 'Apache2 Disable Mod',
+                               'Mod': 'autoindex',
+                                'Status': expected_status})
 
     def test_a2dismod_exception(self):
         '''
         Test if it runs a2dismod for the given module.
         '''
         mock = MagicMock(side_effect=Exception('error'))
-        with patch.dict(deb_apache.__salt__, {'cmd.retcode': mock}):
+        with patch.dict(deb_apache.__salt__, {'cmd.run_all': mock}):
             self.assertEqual(six.text_type(deb_apache.a2dismod('vhost_alias')),
                              'error')
 
