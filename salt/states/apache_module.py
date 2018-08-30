@@ -78,7 +78,9 @@ def disabled(name, force=False):
     '''
     ret = {'name': name, 'result': True, 'comment': '', 'changes': {}}
 
+    is_debian_family = __grains__['os_family'] == 'Debian'
     is_enabled = __salt__['apache.check_mod_enabled'](name)
+
     if is_enabled:
         if __opts__['test']:
             msg = 'Apache module {0} is set to be disabled.'.format(name)
@@ -87,7 +89,12 @@ def disabled(name, force=False):
             ret['changes']['new'] = None
             ret['result'] = None
             return ret
-        status = __salt__['apache.a2dismod'](name, force=force)['Status']
+        # pass in the ``force`` argument on debian systems only
+        if is_debian_family:
+            status = __salt__['apache.a2dismod'](name, force=force)['Status']
+        else:
+            status = __salt__['apache.a2dismod'](name)['Status']
+
         if isinstance(status, six.string_types) and 'disabled' in status:
             ret['result'] = True
             ret['changes']['old'] = name
